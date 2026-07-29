@@ -1,27 +1,6 @@
-# Web Support (Experimental)
-
-Web support is still experimental. APIs and behavior can change in future releases without a major version bump. Expect breaking changes until the web path is stabilized.
+# Web Support
 
 ## Enriched Text Input
-
-### What works
-
-- Inline marks: bold, italic, underline, strikethrough, inline code
-- Headings (h1-h6)
-- Blockquote, code block
-- Ordered lists, unordered lists, checkbox lists
-- Images (via `setImage` ref method and optional `onPasteImages` when pasting image data)
-- Manual links (via `setLink` ref method)
-- Mentions
-- Automatic link detection
-- `getHTML`, `setValue`, selection mapping
-- Core callbacks: `onChange`, `onChangeState`, `onFocus`, `onBlur`, `onSelectionChange`
-- Submit props: `submitBehavior` and `onSubmitEditing`. `returnKeyType` is only a hint, it maps to [enterkeyhint](https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/enterkeyhint) (`done`, `go`, `next`, `previous`, `search`, `send`, `default`/`enter`). Not all values of `ReturnKeyTypeOptions` are supported, the behavior of this prop is heavily dependent on the browser's capabilities.
-- Input theming via `placeholderTextColor`, `cursorColor` and `selectionColor` props
-- Keyboard shortcuts for formatting
-- `useHtmlNormalizer`
-- Setting text alignment via `setTextAlignment()`
-- `textShortcuts`
 
 ### Keyboard shortcuts
 
@@ -35,17 +14,6 @@ See [Web Keyboard Shortcuts](./INPUT_API_REFERENCE.md#web-keyboard-shortcuts) fo
 - **`ViewProps`**: Props inherited from `View` beyond the implemented subset are not forwarded.
 
 ## Enriched Text
-
-### What works
-
-- Customizing the styling using props: `style`, `htmlStyle`, `selectionColor`.
-- `selectable` prop
-- `useHtmlNormalizer`
-- `onLinkPress` and `onMentionPress` callbacks
-- Truncation via `numberOfLines` and `ellipsizeMode` (`head`, `middle`, `tail`, `clip`).
-
-> [!NOTE]
-> Truncation measures the rendered DOM in a layout effect, so it only runs on the client. Under SSR the server renders no text and the clamped content appears after hydration - expect a flash / layout shift on first paint when combining `numberOfLines` with `ellipsizeMode`.
 
 ### Unsupported
 
