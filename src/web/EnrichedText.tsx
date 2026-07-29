@@ -3,6 +3,7 @@ import {
   useImperativeHandle,
   useMemo,
   useRef,
+  useState,
   type CSSProperties,
 } from 'react';
 import type { EnrichedTextProps } from '../types';
@@ -18,6 +19,7 @@ import { prepareHtmlForWeb } from './normalization/prepareHtmlForWeb';
 import { INLINE_IMAGE_CSS_VARIABLES } from './styleConversion/inlineImageCSSVariables';
 import { useImageErrorFallback } from './useImageErrorFallback';
 import { usePressInteractions } from './usePressInteractions';
+import { useEllipsizeMode } from './ellipsizeMode/useEllipsizeMode';
 import { adaptWebToNativeEvent } from './adaptWebToNativeEvent';
 import { useStableRef } from './useStableRef';
 import { assertBrowserEnvironment } from './assertBrowserEnvironment';
@@ -29,6 +31,8 @@ export const EnrichedText = memo(
     htmlStyle,
     style,
     selectionColor,
+    ellipsizeMode = 'tail',
+    numberOfLines = 0,
     selectable = false,
     useHtmlNormalizer = true,
     sanitizationConfig,
@@ -62,6 +66,10 @@ export const EnrichedText = memo(
     const finalHtml = useMemo(
       () => prepareHtmlForWeb(sanitizedHtml, useHtmlNormalizer),
       [sanitizedHtml, useHtmlNormalizer]
+    );
+
+    const [clampedHtml, setClampedHtml] = useState<string | null>(
+      numberOfLines <= 0 ? finalHtml : null
     );
 
     const resolvedHtmlStyle = useMemo(
@@ -102,6 +110,16 @@ export const EnrichedText = memo(
       [textStyle, themingStyle, cssVars]
     );
 
+    useEllipsizeMode({
+      containerRef,
+      finalHtml,
+      ellipsizeMode,
+      numberOfLines,
+      setClampedHtml,
+      style,
+      htmlStyle,
+    });
+
     const onLinkPressRef = useStableRef(onLinkPress);
     const onMentionPressRef = useStableRef(onMentionPress);
 
@@ -122,7 +140,7 @@ export const EnrichedText = memo(
           onBlur={(event) =>
             onBlur?.(adaptWebToNativeEvent(event, { target: -1 }))
           }
-          dangerouslySetInnerHTML={{ __html: finalHtml }}
+          dangerouslySetInnerHTML={{ __html: clampedHtml ?? '' }}
         />
       </>
     );
