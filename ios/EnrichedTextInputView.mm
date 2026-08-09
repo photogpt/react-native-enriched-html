@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 20538)
-Total output lines: 2254
-
 #import "EnrichedTextInputView.h"
 #import "AlignmentUtils.h"
 #import "AttachmentLayoutUtils.h"
@@ -1133,7 +1130,50 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
       _recentlyEmittedAlignment = currentAlignment;
 
       emitter->onChangeState(
-          …538 tokens truncated… = nullptr;
+          {.bold = GET_STYLE_STATE([BoldStyle getType]),
+           .italic = GET_STYLE_STATE([ItalicStyle getType]),
+           .underline = GET_STYLE_STATE([UnderlineStyle getType]),
+           .strikeThrough = GET_STYLE_STATE([StrikethroughStyle getType]),
+           .inlineCode = GET_STYLE_STATE([InlineCodeStyle getType]),
+           .link = GET_STYLE_STATE([LinkStyle getType]),
+           .mention = GET_STYLE_STATE([MentionStyle getType]),
+           .h1 = GET_STYLE_STATE([H1Style getType]),
+           .h2 = GET_STYLE_STATE([H2Style getType]),
+           .h3 = GET_STYLE_STATE([H3Style getType]),
+           .h4 = GET_STYLE_STATE([H4Style getType]),
+           .h5 = GET_STYLE_STATE([H5Style getType]),
+           .h6 = GET_STYLE_STATE([H6Style getType]),
+           .unorderedList = GET_STYLE_STATE([UnorderedListStyle getType]),
+           .orderedList = GET_STYLE_STATE([OrderedListStyle getType]),
+           .blockQuote = GET_STYLE_STATE([BlockQuoteStyle getType]),
+           .codeBlock = GET_STYLE_STATE([CodeBlockStyle getType]),
+           .image = GET_STYLE_STATE([ImageStyle getType]),
+           .checkboxList = GET_STYLE_STATE([CheckboxListStyle getType]),
+           .alignment = [currentAlignment UTF8String]});
+    }
+  }
+
+  if (detectedLinkData != nullptr) {
+    // emit onLinkeDetected event
+    [self emitOnLinkDetectedEvent:detectedLinkData range:detectedLinkRange];
+  } else if (shouldClearLink) {
+    LinkData *emptyLinkData = [[LinkData alloc] init];
+    emptyLinkData.text = @"";
+    emptyLinkData.url = @"";
+    [self emitOnLinkDetectedEvent:emptyLinkData range:NSMakeRange(0, 0)];
+  }
+
+  if (detectedMentionParams != nullptr) {
+    // emit onMentionDetected event
+    [self emitOnMentionDetectedEvent:detectedMentionParams.text
+                           indicator:detectedMentionParams.indicator
+                          attributes:detectedMentionParams.attributes];
+
+    _recentlyActiveMentionParams = detectedMentionParams;
+    _recentlyActiveMentionRange = detectedMentionRange;
+  } else if (shouldClearMention) {
+    [self emitOnMentionDetectedEvent:@"" indicator:@"" attributes:@"{}"];
+    _recentlyActiveMentionParams = nullptr;
     _recentlyActiveMentionRange = NSMakeRange(0, 0);
   }
   // emit onChangeHtml event if needed
