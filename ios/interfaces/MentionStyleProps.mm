@@ -24,6 +24,56 @@
     nativeProps.backgroundColor = [UIColor yellowColor];
   }
 
+  if (folly["borderColor"].isNumber()) {
+    facebook::react::SharedColor borderColor = facebook::react::SharedColor(
+        facebook::react::Color(int32_t(folly["borderColor"].asInt())));
+    nativeProps.borderColor = RCTUIColorFromSharedColor(borderColor);
+  } else {
+    nativeProps.borderColor = [UIColor clearColor];
+  }
+
+  nativeProps.borderRadius =
+      folly["borderRadius"].isNumber() ? folly["borderRadius"].asDouble() : 0;
+  nativeProps.borderWidth =
+      folly["borderWidth"].isNumber() ? folly["borderWidth"].asDouble() : 0;
+  nativeProps.fontSize =
+      folly["fontSize"].isNumber() ? folly["fontSize"].asDouble() : 0;
+  nativeProps.fontStyle =
+      folly["fontStyle"].isString()
+          ? [NSString fromCppString:folly["fontStyle"].asString()]
+          : @"normal";
+  if (folly["fontWeight"].isString()) {
+    nativeProps.fontWeight =
+        [NSString fromCppString:folly["fontWeight"].asString()];
+  } else if (folly["fontWeight"].isNumber()) {
+    nativeProps.fontWeight =
+        [NSString stringWithFormat:@"%d", folly["fontWeight"].asInt()];
+  } else {
+    nativeProps.fontWeight = @"normal";
+  }
+  nativeProps.letterSpacing =
+      folly["letterSpacing"].isNumber() ? folly["letterSpacing"].asDouble() : 0;
+  nativeProps.margin =
+      folly["margin"].isNumber() ? folly["margin"].asDouble() : 0;
+  nativeProps.marginBottom = folly["marginBottom"].isNumber()
+                                 ? folly["marginBottom"].asDouble()
+                                 : nativeProps.margin;
+  nativeProps.marginLeft = folly["marginLeft"].isNumber()
+                               ? folly["marginLeft"].asDouble()
+                               : nativeProps.margin;
+  nativeProps.marginRight = folly["marginRight"].isNumber()
+                                ? folly["marginRight"].asDouble()
+                                : nativeProps.margin;
+  nativeProps.marginTop = folly["marginTop"].isNumber()
+                              ? folly["marginTop"].asDouble()
+                              : nativeProps.margin;
+  nativeProps.paddingHorizontal = folly["paddingHorizontal"].isNumber()
+                                      ? folly["paddingHorizontal"].asDouble()
+                                      : 0;
+  nativeProps.paddingVertical = folly["paddingVertical"].isNumber()
+                                    ? folly["paddingVertical"].asDouble()
+                                    : 0;
+
   if (folly["textDecorationLine"].isString()) {
     std::string textDecorationLine = folly["textDecorationLine"].asString();
     nativeProps.decorationLine = [[NSString fromCppString:textDecorationLine]

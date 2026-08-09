@@ -41,6 +41,7 @@
 - (void)addMentionAtRange:(NSRange)range params:(MentionParams *)params;
 - (void)startMentionWithIndicator:(NSString *)indicator;
 - (void)handleExistingMentions;
+- (BOOL)handleBackspaceInRange:(NSRange)range replacementText:(NSString *)text;
 - (void)manageMentionEditing;
 - (MentionParams *)getMentionParamsAt:(NSUInteger)location;
 - (NSRange)getFullMentionRangeAt:(NSUInteger)location;

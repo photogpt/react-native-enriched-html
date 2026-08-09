@@ -1,10 +1,23 @@
 #import "LayoutManagerExtension.h"
 #import "ColorExtension.h"
 #import "EnrichedViewHost.h"
+#import "MentionStyleProps.h"
 #import "RangeUtils.h"
 #import "StyleHeaders.h"
 #import "WeakBox.h"
 #import <objc/runtime.h>
+
+static BOOL MentionUsesClock3Icon(MentionParams *mention) {
+  if (mention.attributes == nullptr) {
+    return NO;
+  }
+  NSData *data = [mention.attributes dataUsingEncoding:NSUTF8StringEncoding];
+  NSDictionary *attributes = data ? [NSJSONSerialization JSONObjectWithData:data
+                                                                    options:0
+                                                                      error:nil]
+                                  : nil;
+  return [attributes[@"icon"] isEqualToString:@"clock3"];
+}
 
 @implementation NSLayoutManager (LayoutManagerExtension)
 
@@ -60,6 +73,164 @@ static void const *kInputKey = &kInputKey;
   [self drawBlockQuotes:host origin:origin visibleCharRange:visibleCharRange];
   [self drawLists:host origin:origin visibleCharRange:visibleCharRange];
   [self drawCodeBlocks:host origin:origin visibleCharRange:visibleCharRange];
+  [self drawMentionBoxes:host origin:origin visibleCharRange:visibleCharRange];
+}
+
+- (void)drawMentionBoxes:(id<EnrichedViewHost>)host
+                  origin:(CGPoint)origin
+        visibleCharRange:(NSRange)visibleCharRange {
+  MentionStyle *mentionStyle = host.stylesDict[@([MentionStyle getType])];
+  if (mentionStyle == nullptr) {
+    return;
+  }
+
+  for (StylePair *pair in [mentionStyle all:visibleCharRange]) {
+    MentionParams *mention = (MentionParams *)pair.styleValue;
+    MentionStyleProps *props =
+        [host.config mentionStylePropsForIndicator:mention.indicator];
+    BOOL drawsBox = props.borderRadius > 0 || props.borderWidth > 0 ||
+                    props.marginBottom > 0 || props.marginLeft > 0 ||
+                    props.marginRight > 0 || props.marginTop > 0 ||
+                    props.paddingHorizontal > 0 || props.paddingVertical > 0;
+    BOOL drawsClock = MentionUsesClock3Icon(mention);
+    if (!drawsBox && !drawsClock) {
+      continue;
+    }
+
+    NSRange mentionCharacterRange = [pair.rangeValue rangeValue];
+    BOOL hasLeadingSpacer =
+        mentionCharacterRange.length > 0 &&
+        [host.textView.textStorage.string
+            characterAtIndex:mentionCharacterRange.location] == 0x200B;
+    NSRange mentionGlyphRange =
+        [self glyphRangeForCharacterRange:mentionCharacterRange
+                     actualCharacterRange:nullptr];
+    [self
+        enumerateLineFragmentsForGlyphRange:mentionGlyphRange
+                                 usingBlock:^(CGRect lineRect, CGRect usedRect,
+                                              NSTextContainer *textContainer,
+                                              NSRange lineGlyphRange,
+                                              BOOL *stop) {
+                                   NSRange range = NSIntersectionRange(
+                                       mentionGlyphRange, lineGlyphRange);
+                                   if (range.length == 0) {
+                                     return;
+                                   }
+
+                                   CGRect rect = [self
+                                       boundingRectForGlyphRange:range
+                                                 inTextContainer:textContainer];
+                                   rect.origin.x += origin.x;
+                                   rect.origin.y += origin.y;
+                                   if (hasLeadingSpacer) {
+                                     rect.origin.x += props.marginLeft;
+                                     rect.origin.y += props.marginTop;
+                                     rect.size.width = MAX(
+                                         rect.size.width - props.marginLeft -
+                                             props.marginRight,
+                                         0);
+                                     rect.size.height = MAX(
+                                         rect.size.height - props.marginTop -
+                                             props.marginBottom,
+                                         0);
+                                   } else {
+                                     CGFloat leftExpansion =
+                                         MAX(props.paddingHorizontal -
+                                                 props.marginLeft,
+                                             0);
+                                     CGFloat rightExpansion =
+                                         MAX(props.paddingHorizontal -
+                                                 props.marginRight,
+                                             0);
+                                     CGFloat topExpansion =
+                                         MAX(props.paddingVertical -
+                                                 props.marginTop,
+                                             0);
+                                     CGFloat bottomExpansion =
+                                         MAX(props.paddingVertical -
+                                                 props.marginBottom,
+                                             0);
+                                     rect.origin.x -= leftExpansion;
+                                     rect.origin.y -= topExpansion;
+                                     rect.size.width +=
+                                         leftExpansion + rightExpansion;
+                                     rect.size.height +=
+                                         topExpansion + bottomExpansion;
+                                   }
+
+                                   if (drawsBox) {
+                                     UIBezierPath *path = [UIBezierPath
+                                         bezierPathWithRoundedRect:rect
+                                                      cornerRadius:
+                                                          props.borderRadius];
+                                     [[props.backgroundColor
+                                             colorWithResolvedAlpha] setFill];
+                                     [path fill];
+
+                                     if (props.borderWidth > 0) {
+                                       [props.borderColor setStroke];
+                                       path.lineWidth = props.borderWidth;
+                                       [path stroke];
+                                     }
+                                   }
+
+                                   NSUInteger labelLocation =
+                                       mentionCharacterRange.location +
+                                       (hasLeadingSpacer ? 1 : 0);
+                                   NSRange labelGlyphRange = [self
+                                       glyphRangeForCharacterRange:
+                                           NSMakeRange(labelLocation, 1)
+                                              actualCharacterRange:nullptr];
+                                   NSRange visibleLabelGlyphRange =
+                                       NSIntersectionRange(labelGlyphRange,
+                                                           range);
+                                   if (drawsClock &&
+                                       visibleLabelGlyphRange.length > 0) {
+                                     CGRect labelRect =
+                                         [self boundingRectForGlyphRange:
+                                                   labelGlyphRange
+                                                         inTextContainer:
+                                                             textContainer];
+                                     labelRect.origin.x += origin.x;
+                                     labelRect.origin.y += origin.y;
+                                     UIFont *font = [host.textView.textStorage
+                                              attribute:NSFontAttributeName
+                                                atIndex:labelLocation
+                                         effectiveRange:nullptr];
+                                     CGFloat iconSize =
+                                         font ? font.pointSize : props.fontSize;
+                                     CGFloat scale = iconSize / 24;
+                                     CGFloat iconX = CGRectGetMinX(labelRect) -
+                                                     iconSize / 3 - iconSize;
+                                     CGFloat iconY = CGRectGetMidY(labelRect) -
+                                                     iconSize / 2;
+                                     UIBezierPath *clock = [UIBezierPath
+                                         bezierPathWithOvalInRect:
+                                             CGRectMake(iconX + 2 * scale,
+                                                        iconY + 2 * scale,
+                                                        20 * scale,
+                                                        20 * scale)];
+                                     [clock moveToPoint:CGPointMake(
+                                                            iconX + 12 * scale,
+                                                            iconY + 6 * scale)];
+                                     [clock
+                                         addLineToPoint:CGPointMake(
+                                                            iconX + 12 * scale,
+                                                            iconY +
+                                                                12 * scale)];
+                                     [clock
+                                         addLineToPoint:CGPointMake(
+                                                            iconX + 16 * scale,
+                                                            iconY +
+                                                                12 * scale)];
+                                     clock.lineWidth = 2 * scale;
+                                     clock.lineCapStyle = kCGLineCapRound;
+                                     clock.lineJoinStyle = kCGLineJoinRound;
+                                     [props.color setStroke];
+                                     [clock stroke];
+                                   }
+                                 }];
+  }
 }
 
 - (void)drawCodeBlocks:(id<EnrichedViewHost>)host

@@ -4,6 +4,7 @@ import android.graphics.Color
 import com.facebook.react.bridge.ColorPropConverter
 import com.facebook.react.bridge.ReactContext
 import com.facebook.react.bridge.ReadableMap
+import com.facebook.react.views.text.ReactTypefaceUtils.parseFontStyle
 import com.facebook.react.views.text.ReactTypefaceUtils.parseFontWeight
 import com.swmansion.enriched.common.EnrichedConstants
 import com.swmansion.enriched.common.EnrichedStyle
@@ -152,7 +153,9 @@ class HtmlStyle : EnrichedStyle {
   private fun parseFloat(
     map: ReadableMap?,
     key: String,
+    fallback: Float? = null,
   ): Float {
+    if (fallback != null && (map == null || !map.hasKey(key) || map.isNull(key))) return fallback
     val safeMap = ensureValueIsSet(map, key)
     val value = safeMap.getDouble(key)
     return ceil(pixelFromSpOrDp(value, view?.allowFontScaling ?: EnrichedConstants.ALLOW_FONT_SCALING_DEFAULT))
@@ -250,8 +253,41 @@ class HtmlStyle : EnrichedStyle {
 
       val color = parseColor(value, "color")
       val backgroundColor = parseColorWithOpacity(value, "backgroundColor", 80)
+      val borderColor = parseColor(value, "borderColor")
+      val borderRadius = parseFloat(value, "borderRadius")
+      val borderWidth = parseFloat(value, "borderWidth")
+      val fontSize = parseFloat(value, "fontSize")
+      val fontStyle = parseFontStyle(value.getString("fontStyle"))
+      val fontWeight = parseFontWeight(value.getString("fontWeight"))
+      val letterSpacing = parseFloat(value, "letterSpacing")
+      val margin = parseFloat(value, "margin")
+      val marginBottom = parseFloat(value, "marginBottom", margin)
+      val marginLeft = parseFloat(value, "marginLeft", margin)
+      val marginRight = parseFloat(value, "marginRight", margin)
+      val marginTop = parseFloat(value, "marginTop", margin)
+      val paddingHorizontal = parseFloat(value, "paddingHorizontal")
+      val paddingVertical = parseFloat(value, "paddingVertical")
       val isUnderline = parseIsUnderline(value)
-      val parsedStyle = MentionStyle(color, backgroundColor, isUnderline)
+      val parsedStyle =
+        MentionStyle(
+          color = color,
+          backgroundColor = backgroundColor,
+          underline = isUnderline,
+          borderColor = borderColor,
+          borderRadius = borderRadius,
+          borderWidth = borderWidth,
+          fontSize = fontSize,
+          fontStyle = fontStyle,
+          fontWeight = fontWeight,
+          letterSpacing = letterSpacing,
+          margin = margin,
+          marginBottom = marginBottom,
+          marginLeft = marginLeft,
+          marginRight = marginRight,
+          marginTop = marginTop,
+          paddingHorizontal = paddingHorizontal,
+          paddingVertical = paddingVertical,
+        )
       parsedMentionsStyle.put(key, parsedStyle)
     }
 

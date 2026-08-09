@@ -47,6 +47,16 @@ export const DEFAULT_HTML_STYLE: Required<HtmlStyle> = {
   mention: {
     color: 'blue',
     backgroundColor: 'yellow',
+    borderColor: 'transparent',
+    borderRadius: 0,
+    borderWidth: 0,
+    fontSize: 0,
+    fontStyle: 'normal',
+    fontWeight: 'normal',
+    letterSpacing: 0,
+    margin: 0,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
     textDecorationLine: 'underline',
   },
   ol: {

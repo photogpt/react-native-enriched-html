@@ -5,9 +5,22 @@
 #import "TextInsertionUtils.h"
 #import "UIView+React.h"
 #import "WordsUtils.h"
+#import <React/RCTFont.h>
 
 // custom NSAttributedStringKey to differentiate from links
 static NSString *const MentionAttributeName = @"EnrichedMention";
+
+static BOOL MentionUsesClock3Icon(MentionParams *params) {
+  if (params.attributes == nullptr) {
+    return NO;
+  }
+  NSData *data = [params.attributes dataUsingEncoding:NSUTF8StringEncoding];
+  NSDictionary *attributes = data ? [NSJSONSerialization JSONObjectWithData:data
+                                                                    options:0
+                                                                      error:nil]
+                                  : nil;
+  return [attributes[@"icon"] isEqualToString:@"clock3"];
+}
 
 @implementation MentionStyle {
   NSValue *_activeMentionRange;
@@ -51,12 +64,37 @@ static NSString *const MentionAttributeName = @"EnrichedMention";
   MentionStyleProps *styleProps =
       [self.host.config mentionStylePropsForIndicator:params.indicator];
 
+  NSUInteger visibleFontIndex = range.location;
+  if ([self.host.textView.textStorage.string
+          characterAtIndex:visibleFontIndex] == 0x200B) {
+    visibleFontIndex += 1;
+  }
+  UIFont *currentFont =
+      [self.host.textView.textStorage attribute:NSFontAttributeName
+                                        atIndex:visibleFontIndex
+                                 effectiveRange:nullptr]
+          ?: self.host.config.primaryFont;
+  UIFont *mentionFont = [RCTFont
+           updateFont:currentFont
+           withFamily:nullptr
+                 size:styleProps.fontSize > 0 ? @(styleProps.fontSize) : nullptr
+               weight:styleProps.fontWeight
+                style:styleProps.fontStyle
+              variant:nullptr
+      scaleMultiplier:1];
   NSMutableDictionary *newAttrs = [@{
     NSForegroundColorAttributeName : styleProps.color,
     NSUnderlineColorAttributeName : styleProps.color,
     NSStrikethroughColorAttributeName : styleProps.color,
-    NSBackgroundColorAttributeName :
-        [styleProps.backgroundColor colorWithResolvedAlpha],
+    NSBackgroundColorAttributeName : styleProps.borderRadius > 0 ||
+            styleProps.borderWidth > 0 || styleProps.marginBottom > 0 ||
+            styleProps.marginLeft > 0 || styleProps.marginRight > 0 ||
+            styleProps.marginTop > 0 || styleProps.paddingHorizontal > 0 ||
+            styleProps.paddingVertical > 0
+        ? UIColor.clearColor
+        : [styleProps.backgroundColor colorWithResolvedAlpha],
+    NSFontAttributeName : mentionFont,
+    NSKernAttributeName : @(styleProps.letterSpacing),
   } mutableCopy];
 
   if (styleProps.decorationLine == DecorationUnderline) {
@@ -64,6 +102,29 @@ static NSString *const MentionAttributeName = @"EnrichedMention";
   }
 
   [self.host.textView.textStorage addAttributes:newAttrs range:range];
+
+  if (range.length >= 2 && [self.host.textView.textStorage.string
+                               characterAtIndex:range.location] == 0x200B) {
+    CGFloat iconSize =
+        MentionUsesClock3Icon(params) ? mentionFont.pointSize : 0;
+    CGFloat horizontalSpace = styleProps.paddingHorizontal +
+                              styleProps.marginLeft +
+                              (iconSize > 0 ? iconSize + iconSize / 3 : 0);
+    UIFont *spacerFont = [mentionFont
+        fontWithSize:mentionFont.pointSize + 2 * styleProps.paddingVertical +
+                     styleProps.marginTop + styleProps.marginBottom];
+    NSDictionary *spacerAttrs = @{
+      NSKernAttributeName : @(horizontalSpace),
+      NSFontAttributeName : spacerFont,
+    };
+    [self.host.textView.textStorage
+        addAttributes:spacerAttrs
+                range:NSMakeRange(range.location, 1)];
+    [self.host.textView.textStorage
+        addAttribute:NSKernAttributeName
+               value:@(styleProps.paddingHorizontal + styleProps.marginRight)
+               range:NSMakeRange(NSMaxRange(range) - 1, 1)];
+  }
 }
 
 - (void)reapplyFromStylePair:(StylePair *)pair {
@@ -173,8 +234,10 @@ static NSString *const MentionAttributeName = @"EnrichedMention";
     }
   }
 
-  NSString *newText =
-      hasSpaceAfter ? text : [NSString stringWithFormat:@"%@ ", text];
+  NSString *mentionText = [NSString stringWithFormat:@"\u200B%@", text];
+  NSString *newText = hasSpaceAfter
+                          ? mentionText
+                          : [NSString stringWithFormat:@"%@ ", mentionText];
 
   [TextInsertionUtils replaceText:newText
                                at:rangeToBeReplaced
@@ -191,7 +254,8 @@ static NSString *const MentionAttributeName = @"EnrichedMention";
   }
 
   // THEN, add the attributes to not apply them on the space
-  NSRange mentionRange = NSMakeRange(rangeToBeReplaced.location, text.length);
+  NSRange mentionRange =
+      NSMakeRange(rangeToBeReplaced.location, mentionText.length);
   [self applyMentionMeta:params range:mentionRange];
   [self.host.attributesManager addDirtyRange:mentionRange];
   // mention editing should finish
@@ -203,10 +267,33 @@ static NSString *const MentionAttributeName = @"EnrichedMention";
 - (void)addMentionAtRange:(NSRange)range params:(MentionParams *)params {
   _blockMentionEditing = YES;
 
-  [self applyMentionMeta:params range:range];
-  [self.host.attributesManager addDirtyRange:range];
+  NSString *text =
+      [self.host.textView.textStorage.string substringWithRange:range];
+  NSString *spacedText = [NSString stringWithFormat:@"\u200B%@", text];
+  [self.host.textView.textStorage replaceCharactersInRange:range
+                                                withString:spacedText];
+  NSRange mentionRange = NSMakeRange(range.location, spacedText.length);
+  [self applyMentionMeta:params range:mentionRange];
+  [self.host.attributesManager addDirtyRange:mentionRange];
 
   _blockMentionEditing = NO;
+}
+
+- (BOOL)handleBackspaceInRange:(NSRange)range replacementText:(NSString *)text {
+  if (text.length > 0 || range.length != 1) {
+    return NO;
+  }
+  MentionParams *params = [self getMentionParamsAt:range.location];
+  if (params == nullptr) {
+    return NO;
+  }
+  NSRange mentionRange = [self getFullMentionRangeAt:range.location];
+  [TextInsertionUtils replaceText:@""
+                               at:mentionRange
+             additionalAttributes:nullptr
+                             host:self.host
+                    withSelection:YES];
+  return YES;
 }
 
 - (void)startMentionWithIndicator:(NSString *)indicator {
@@ -301,7 +388,9 @@ static NSString *const MentionAttributeName = @"EnrichedMention";
 
     // check for text, any modifications to it makes mention invalid
     NSString *existingText =
-        [self.host.textView.textStorage.string substringWithRange:currentRange];
+        [[self.host.textView.textStorage.string substringWithRange:currentRange]
+            stringByReplacingOccurrencesOfString:@"\u200B"
+                                      withString:@""];
     if (![existingText isEqualToString:currentText]) {
       [rangesToRemove addObject:[NSValue valueWithRange:currentRange]];
     }

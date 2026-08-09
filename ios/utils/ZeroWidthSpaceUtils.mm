@@ -28,9 +28,12 @@
 
       NSRange paragraphRange = [host.textView.textStorage.string
           paragraphRangeForRange:characterRange];
+      MentionStyle *mentionStyle = host.stylesDict[@([MentionStyle getType])];
+      BOOL isMentionSpacer =
+          mentionStyle != nullptr && [mentionStyle detect:characterRange];
       // having paragraph longer than 1 character means someone most likely
       // added something and we probably can remove the space
-      BOOL removeSpace = paragraphRange.length > 1;
+      BOOL removeSpace = paragraphRange.length > 1 && !isMentionSpacer;
       // exception; 2 characters paragraph with zero width space + newline
       // here, we still need zero width space to keep the empty list items
       if (paragraphRange.length == 2 && paragraphRange.location == i &&
@@ -46,7 +49,8 @@
       }
 
       // zero width spaces with no needsZWS style on them get removed
-      if (![self anyZWSStylePresentInRange:characterRange host:host]) {
+      if (!isMentionSpacer && ![self anyZWSStylePresentInRange:characterRange
+                                                          host:host]) {
         [indexesToBeRemoved addObject:@(characterRange.location)];
       }
     }

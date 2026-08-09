@@ -4,6 +4,7 @@ import android.graphics.Color
 import com.facebook.react.bridge.ColorPropConverter
 import com.facebook.react.bridge.ReactContext
 import com.facebook.react.bridge.ReadableMap
+import com.facebook.react.views.text.ReactTypefaceUtils.parseFontStyle
 import com.facebook.react.views.text.ReactTypefaceUtils.parseFontWeight
 import com.swmansion.enriched.common.EnrichedStyle
 import com.swmansion.enriched.common.MentionStyle
@@ -117,7 +118,7 @@ data class EnrichedTextStyle(
         codeBlockRadius = parseFloat(codeblock, "borderRadius", allowFontScaling),
         inlineCodeColor = parseColor(context, inlineCode, "color"),
         inlineCodeBackgroundColor = parseColorWithOpacity(context, inlineCode, "backgroundColor", 80),
-        mentionsStyle = parseMentionsStyle(context, mentions),
+        mentionsStyle = parseMentionsStyle(context, mentions, allowFontScaling),
       )
     }
 
@@ -125,8 +126,9 @@ data class EnrichedTextStyle(
       map: ReadableMap?,
       key: String,
       allowFontScaling: Boolean,
+      fallback: Float = 0f,
     ): Float {
-      if (map == null || !map.hasKey(key) || map.isNull(key)) return 0f
+      if (map == null || !map.hasKey(key) || map.isNull(key)) return fallback
       return ceil(pixelFromSpOrDp(map.getDouble(key), allowFontScaling))
     }
 
@@ -180,12 +182,14 @@ data class EnrichedTextStyle(
     private fun parseMentionsStyle(
       context: ReactContext,
       map: ReadableMap?,
+      allowFontScaling: Boolean,
     ): Map<String, MentionStyle> {
       val result = mutableMapOf<String, MentionStyle>()
       val iterator = map?.keySetIterator() ?: return result
       while (iterator.hasNextKey()) {
         val key = iterator.nextKey()
         val value = map.getMap(key) ?: continue
+        val margin = parseFloat(value, "margin", allowFontScaling)
 
         result[key] =
           MentionStyle(
@@ -194,6 +198,20 @@ data class EnrichedTextStyle(
             underline = parseIsUnderline(value),
             pressColor = parseColor(context, value, "pressColor"),
             pressBackgroundColor = parseColorWithOpacity(context, value, "pressBackgroundColor", 80),
+            borderColor = parseColor(context, value, "borderColor"),
+            borderRadius = parseFloat(value, "borderRadius", allowFontScaling),
+            borderWidth = parseFloat(value, "borderWidth", allowFontScaling),
+            fontSize = parseFloat(value, "fontSize", allowFontScaling),
+            fontStyle = parseFontStyle(value.getString("fontStyle")),
+            fontWeight = parseFontWeight(value.getString("fontWeight")),
+            letterSpacing = parseFloat(value, "letterSpacing", allowFontScaling),
+            margin = margin,
+            marginBottom = parseFloat(value, "marginBottom", allowFontScaling, margin),
+            marginLeft = parseFloat(value, "marginLeft", allowFontScaling, margin),
+            marginRight = parseFloat(value, "marginRight", allowFontScaling, margin),
+            marginTop = parseFloat(value, "marginTop", allowFontScaling, margin),
+            paddingHorizontal = parseFloat(value, "paddingHorizontal", allowFontScaling),
+            paddingVertical = parseFloat(value, "paddingVertical", allowFontScaling),
           )
       }
       return result
