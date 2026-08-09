@@ -66,8 +66,7 @@ class EnrichedTextWatcher(
 
   override fun afterTextChanged(s: Editable?) {
     if (s == null) return
-    emitEvents(s)
-
+    if (!view.suppressChangeEvents) emitEvents(s)
     if (view.isDuringTransaction) return
     applyStyles(s)
     view.layoutManager.invalidateLayout()

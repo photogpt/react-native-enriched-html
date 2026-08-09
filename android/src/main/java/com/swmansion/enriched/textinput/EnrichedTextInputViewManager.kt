@@ -15,6 +15,7 @@ import com.facebook.react.uimanager.annotations.ReactProp
 import com.facebook.react.viewmanagers.EnrichedTextInputViewManagerDelegate
 import com.facebook.react.viewmanagers.EnrichedTextInputViewManagerInterface
 import com.facebook.yoga.YogaMeasureMode
+import com.swmansion.enriched.text.events.OnMentionPressEvent
 import com.swmansion.enriched.textinput.events.OnChangeHtmlEvent
 import com.swmansion.enriched.textinput.events.OnChangeSelectionEvent
 import com.swmansion.enriched.textinput.events.OnChangeStateEvent
@@ -70,6 +71,7 @@ class EnrichedTextInputViewManager :
     map.put(OnLinkDetectedEvent.EVENT_NAME, mapOf("registrationName" to OnLinkDetectedEvent.EVENT_NAME))
     map.put(OnMentionDetectedEvent.EVENT_NAME, mapOf("registrationName" to OnMentionDetectedEvent.EVENT_NAME))
     map.put(OnMentionEvent.EVENT_NAME, mapOf("registrationName" to OnMentionEvent.EVENT_NAME))
+    map.put(OnMentionPressEvent.EVENT_NAME, mapOf("registrationName" to OnMentionPressEvent.EVENT_NAME))
     map.put(OnChangeSelectionEvent.EVENT_NAME, mapOf("registrationName" to OnChangeSelectionEvent.EVENT_NAME))
     map.put(OnRequestHtmlResultEvent.EVENT_NAME, mapOf("registrationName" to OnRequestHtmlResultEvent.EVENT_NAME))
     map.put(OnInputKeyPressEvent.EVENT_NAME, mapOf("registrationName" to OnInputKeyPressEvent.EVENT_NAME))
@@ -343,7 +345,7 @@ class EnrichedTextInputViewManager :
     view: EnrichedTextInputView?,
     text: String,
   ) {
-    view?.setValue(text)
+    view?.setValueFromCommand(text)
   }
 
   override fun setSelection(

@@ -23,6 +23,7 @@ import android.view.KeyEvent
 import android.view.Menu
 import android.view.MenuItem
 import android.view.MotionEvent
+import android.view.ViewConfiguration
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
@@ -43,6 +44,7 @@ import com.swmansion.enriched.common.EnrichedSpanFlags
 import com.swmansion.enriched.common.GumboNormalizer
 import com.swmansion.enriched.common.parser.EnrichedParser
 import com.swmansion.enriched.common.pixelFromSpOrDp
+import com.swmansion.enriched.text.events.OnMentionPressEvent
 import com.swmansion.enriched.textinput.events.MentionHandler
 import com.swmansion.enriched.textinput.events.OnContextMenuItemPressEvent
 import com.swmansion.enriched.textinput.events.OnInputBlurEvent
@@ -56,6 +58,7 @@ import com.swmansion.enriched.textinput.spans.EnrichedInputH4Span
 import com.swmansion.enriched.textinput.spans.EnrichedInputH5Span
 import com.swmansion.enriched.textinput.spans.EnrichedInputH6Span
 import com.swmansion.enriched.textinput.spans.EnrichedInputImageSpan
+import com.swmansion.enriched.textinput.spans.EnrichedInputMentionSpan
 import com.swmansion.enriched.textinput.spans.EnrichedLineHeightSpan
 import com.swmansion.enriched.textinput.spans.EnrichedSpans
 import com.swmansion.enriched.textinput.spans.interfaces.EnrichedInputSpan
@@ -78,6 +81,7 @@ import com.swmansion.enriched.textinput.watchers.EnrichedTextWatcher
 import java.util.regex.Pattern
 import java.util.regex.PatternSyntaxException
 import kotlin.math.ceil
+import kotlin.math.hypot
 
 class EnrichedTextInputView :
   AppCompatEditText,
@@ -93,6 +97,7 @@ class EnrichedTextInputView :
   val alignmentStyles: AlignmentStyles? = AlignmentStyles(this)
   var isDuringTransaction: Boolean = false
   var isRemovingMany: Boolean = false
+  var suppressChangeEvents: Boolean = false
   var scrollEnabled: Boolean = true
   var allowFontScaling: Boolean = EnrichedConstants.ALLOW_FONT_SCALING_DEFAULT
     set(value) {
@@ -148,6 +153,11 @@ class EnrichedTextInputView :
   private var inputMethodManager: InputMethodManager? = null
   private val spannableFactory = EnrichedTextInputSpannableFactory()
   private var contextMenuItems: List<Pair<Int, String>> = emptyList()
+  private var pressedMention: EnrichedInputMentionSpan? = null
+  private var mentionTouchX = 0f
+  private var mentionTouchY = 0f
+  private var mentionTouchMoved = false
+  private val mentionTouchSlop by lazy { ViewConfiguration.get(context).scaledTouchSlop.toFloat() }
 
   constructor(context: Context) : super(context) {
     prepareComponent()
@@ -285,6 +295,49 @@ class EnrichedTextInputView :
 
   // https://github.com/facebook/react-native/blob/36df97f500aa0aa8031098caf7526db358b6ddc1/packages/react-native/ReactAndroid/src/main/java/com/facebook/react/views/textinput/ReactEditText.kt#L295C1-L296C1
   override fun onTouchEvent(ev: MotionEvent): Boolean {
+    when (ev.actionMasked) {
+      MotionEvent.ACTION_DOWN -> {
+        mentionAt(ev)?.let { mention ->
+          pressedMention = mention
+          mentionTouchX = ev.x
+          mentionTouchY = ev.y
+          mentionTouchMoved = false
+          parent.requestDisallowInterceptTouchEvent(true)
+          return true
+        }
+      }
+
+      MotionEvent.ACTION_MOVE -> {
+        if (pressedMention != null) {
+          if (hypot(ev.x - mentionTouchX, ev.y - mentionTouchY) > mentionTouchSlop) {
+            mentionTouchMoved = true
+            parent.requestDisallowInterceptTouchEvent(false)
+          }
+          return true
+        }
+      }
+
+      MotionEvent.ACTION_UP -> {
+        val mention = pressedMention
+        if (mention != null) {
+          if (!mentionTouchMoved && mentionAt(ev) === mention) {
+            clearFocus()
+            emitMentionPress(mention)
+            performClick()
+          }
+          resetMentionTouch()
+          return true
+        }
+      }
+
+      MotionEvent.ACTION_CANCEL -> {
+        if (pressedMention != null) {
+          resetMentionTouch()
+          return true
+        }
+      }
+    }
+
     when (ev.action) {
       MotionEvent.ACTION_DOWN -> {
         detectScrollMovement = true
@@ -309,6 +362,41 @@ class EnrichedTextInputView :
     }
 
     return super.onTouchEvent(ev)
+  }
+
+  private fun mentionAt(event: MotionEvent): EnrichedInputMentionSpan? {
+    val spannable = text as? Spannable ?: return null
+    val textLayout = layout ?: return null
+    val x = (event.x - totalPaddingLeft + scrollX).toInt()
+    val y = (event.y - totalPaddingTop + scrollY).toInt()
+    if (y < 0 || y > textLayout.height) return null
+    val line = textLayout.getLineForVertical(y)
+    if (x < textLayout.getLineLeft(line) || x > textLayout.getLineRight(line)) return null
+    val offset = textLayout.getOffsetForHorizontal(line, x.toFloat())
+    return spannable
+      .getSpans(offset, offset, EnrichedInputMentionSpan::class.java)
+      .firstOrNull { it.getAttributes()["pressable"] == "true" }
+  }
+
+  private fun emitMentionPress(mention: EnrichedInputMentionSpan) {
+    val reactContext = context as ReactContext
+    val surfaceId = UIManagerHelper.getSurfaceId(reactContext)
+    val dispatcher = UIManagerHelper.getEventDispatcherForReactTag(reactContext, id)
+    dispatcher?.dispatchEvent(
+      OnMentionPressEvent(
+        surfaceId,
+        id,
+        mention.getText(),
+        mention.getIndicator(),
+        mention.getAttributes(),
+      ),
+    )
+  }
+
+  private fun resetMentionTouch() {
+    pressedMention = null
+    mentionTouchMoved = false
+    parent.requestDisallowInterceptTouchEvent(false)
   }
 
   override fun canScrollVertically(direction: Int): Boolean = scrollEnabled
@@ -457,6 +545,16 @@ class EnrichedTextInputView :
       setSelection(text?.length ?: 0)
     }
     layoutManager.invalidateLayout()
+  }
+
+  fun setValueFromCommand(value: CharSequence?) {
+    val wasSuppressingChangeEvents = suppressChangeEvents
+    suppressChangeEvents = true
+    try {
+      setValue(value)
+    } finally {
+      suppressChangeEvents = wasSuppressingChangeEvents
+    }
   }
 
   fun setCustomSelection(

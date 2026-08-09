@@ -714,6 +714,9 @@ export interface EnrichedTextInputProps extends Omit<ViewProps, 'children'> {
   /** Called when the editor resolves a mention node. */
   onMentionDetected?: (e: OnMentionDetected) => void;
 
+  /** Called when the user taps a pressable mention inside the editor. */
+  onMentionPress?: (event: OnMentionPressEvent) => void;
+
   /**
    * Called when a mention trigger character is typed. Use this to show a
    * mention picker UI. `indicator` is the trigger character (e.g. `"@"`).

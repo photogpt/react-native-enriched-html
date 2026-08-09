@@ -1,6 +1,7 @@
 #import "TextBlockTapGestureRecognizer.h"
 #import "CheckboxHitTestUtils.h"
 #import "EnrichedTextInputView.h"
+#import "MentionParams.h"
 
 @implementation TextBlockTapGestureRecognizer {
   TextBlockTapKind _tapKind;
@@ -49,6 +50,41 @@
     _characterIndex = checkboxIndex;
     [super touchesBegan:touches withEvent:event];
     return;
+  }
+
+  UITextView *textView = self.input->textView;
+  CGPoint containerPoint =
+      [CheckboxHitTestUtils containerPointFromViewPoint:point
+                                               textView:textView];
+  NSUInteger glyphIndex =
+      [CheckboxHitTestUtils glyphIndexAtContainerPoint:containerPoint
+                                              textView:textView];
+  if (glyphIndex != NSNotFound) {
+    CGRect glyphRect = [textView.layoutManager
+        boundingRectForGlyphRange:NSMakeRange(glyphIndex, 1)
+                  inTextContainer:textView.textContainer];
+    NSUInteger charIndex =
+        [textView.layoutManager characterIndexForGlyphAtIndex:glyphIndex];
+    if (CGRectContainsPoint(glyphRect, containerPoint) &&
+        charIndex < textView.textStorage.length) {
+      MentionParams *mention =
+          [textView.textStorage attribute:@"EnrichedMention"
+                                  atIndex:charIndex
+                           effectiveRange:nil];
+      NSData *data =
+          [mention.attributes dataUsingEncoding:NSUTF8StringEncoding];
+      NSDictionary *attributes =
+          data ? [NSJSONSerialization JSONObjectWithData:data
+                                                 options:0
+                                                   error:nil]
+               : nil;
+      if ([attributes[@"pressable"] isEqualToString:@"true"]) {
+        _tapKind = TextBlockTapKindPressableMention;
+        _characterIndex = (NSInteger)charIndex;
+        [super touchesBegan:touches withEvent:event];
+        return;
+      }
+    }
   }
   self.state = UIGestureRecognizerStateFailed;
 }
