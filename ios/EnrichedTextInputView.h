@@ -13,6 +13,8 @@
 #ifndef EnrichedTextInputViewNativeComponent_h
 #define EnrichedTextInputViewNativeComponent_h
 
+@class MentionParams;
+
 NS_ASSUME_NONNULL_BEGIN
 
 @interface EnrichedTextInputView
@@ -43,6 +45,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (CGSize)measureSize:(CGFloat)maxWidth;
 - (void)emitOnLinkDetectedEvent:(LinkData *)linkData range:(NSRange)range;
 - (void)emitOnMentionEvent:(NSString *)indicator text:(nullable NSString *)text;
+- (void)emitOnMentionPressEvent:(MentionParams *)mention;
 - (void)emitOnPasteImagesEvent:(NSArray<NSDictionary *> *)images;
 - (void)anyTextMayHaveBeenModified;
 - (void)scheduleRelayoutIfNeeded;

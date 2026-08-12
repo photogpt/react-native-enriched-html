@@ -12,6 +12,7 @@ import EnrichedTextInputNativeComponent, {
   type OnContextMenuItemPressEvent,
   type OnMentionEvent,
   type OnMentionDetectedInternal,
+  type OnMentionPressEventInternal,
   type OnRequestHtmlResultEvent,
 } from '../spec/EnrichedTextInputNativeComponent';
 import type {
@@ -31,6 +32,7 @@ import type {
   EnrichedTextInputProps,
   OnLinkDetected,
   OnMentionDetected,
+  OnMentionPressEvent,
 } from '../types';
 
 const warnMentionIndicators = (indicator: string) => {
@@ -67,6 +69,7 @@ export const EnrichedTextInput = ({
   onChangeState,
   onLinkDetected,
   onMentionDetected,
+  onMentionPress: _onMentionPress,
   onStartMention,
   onChangeMention,
   onEndMention,
@@ -311,6 +314,18 @@ export const EnrichedTextInput = ({
     } satisfies OnMentionDetected);
   };
 
+  const onMentionPress = useCallback(
+    (e: NativeSyntheticEvent<OnMentionPressEventInternal>) => {
+      const { text, indicator, attributes } = e.nativeEvent;
+      _onMentionPress?.({
+        text,
+        indicator,
+        attributes: attributes as Record<string, string>,
+      } satisfies OnMentionPressEvent);
+    },
+    [_onMentionPress]
+  );
+
   const handleRequestHtmlResult = (
     e: NativeSyntheticEvent<OnRequestHtmlResultEvent>
   ) => {
@@ -351,6 +366,7 @@ export const EnrichedTextInput = ({
       onChangeState={onChangeState}
       onLinkDetected={handleLinkDetected}
       onMentionDetected={handleMentionDetected}
+      onMentionPress={onMentionPress}
       onMention={handleMentionEvent}
       onChangeSelection={onChangeSelection}
       onRequestHtmlResult={handleRequestHtmlResult}

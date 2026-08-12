@@ -182,7 +182,8 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
     [_placeholderLabel.bottomAnchor
         constraintEqualToAnchor:textView.bottomAnchor]
   ]];
-  _placeholderLabel.lineBreakMode = NSLineBreakByTruncatingTail;
+  _placeholderLabel.numberOfLines = 0;
+  _placeholderLabel.lineBreakMode = NSLineBreakByWordWrapping;
   _placeholderLabel.text = @"";
   _placeholderLabel.hidden = YES;
   _placeholderLabel.adjustsFontForContentSizeCategory = YES;
@@ -1318,6 +1319,9 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
 }
 
 - (void)setValue:(NSString *)value {
+  BOOL wasBlockingEmitting = blockEmitting;
+  blockEmitting = YES;
+
   NSString *initiallyProcessedHtml = [parser initiallyProcessHtml:value];
   if (initiallyProcessedHtml == nullptr) {
     // reset the text first and reset typing attributes
@@ -1333,6 +1337,11 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
   // set selectedRange and check for changes
   textView.selectedRange = NSRange(textView.textStorage.string.length, 0);
   [self anyTextMayHaveBeenModified];
+
+  // setValue is an imperative synchronization command, not a user edit. Its
+  // text/selection callbacks can otherwise race the next keyboard event and
+  // make JS restore an older document or caret.
+  blockEmitting = wasBlockingEmitting;
 }
 
 - (void)setCustomSelection:(NSInteger)visibleStart end:(NSInteger)visibleEnd {
@@ -1352,6 +1361,10 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
 
   while (actualIndex < text.length) {
     if (currentVisibleCount == visibleIndex) {
+      while (actualIndex < text.length &&
+             [text characterAtIndex:actualIndex] == 0x200B) {
+        actualIndex++;
+      }
       return actualIndex;
     }
 
@@ -1956,12 +1969,13 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
   H4Style *h4Style = stylesDict[@([H4Style getType])];
   H5Style *h5Style = stylesDict[@([H5Style getType])];
   H6Style *h6Style = stylesDict[@([H6Style getType])];
+  MentionStyle *mentionStyle = stylesDict[@([MentionStyle getType])];
 
   // some of the changes these checks do could interfere with later checks and
   // cause a crash so here we rely on short circuiting evaluation of the logical
   // expression. Either way it's not possible to have two of them come off at
   // the same time
-  if (
+  if ([mentionStyle handleBackspaceInRange:range replacementText:text] ||
       // ZWS backspace handling for paragraph styles
       [ZeroWidthSpaceUtils handleBackspaceInRange:range
                                   replacementText:text
@@ -2005,20 +2019,30 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
 
 - (void)textViewDidChangeSelection:(UITextView *)textView {
   // emit the event
+  NSString *storageText = textView.textStorage.string;
   NSString *textAtSelection =
-      [[[NSMutableString alloc] initWithString:textView.textStorage.string]
-          substringWithRange:textView.selectedRange];
+      [[storageText substringWithRange:textView.selectedRange]
+          stringByReplacingOccurrencesOfString:@"\u200B"
+                                    withString:@""];
 
   auto emitter = [self getEventEmitter];
   if (emitter != nullptr) {
     // iOS range works differently because it specifies location and length
     // here, start is the location, but end is the first index BEHIND the end.
     // So a 0 length range will have equal start and end
-    emitter->onChangeSelection(
-        {.start = static_cast<int>(textView.selectedRange.location),
-         .end = static_cast<int>(textView.selectedRange.location +
-                                 textView.selectedRange.length),
-         .text = [textAtSelection toCppString]});
+    NSUInteger actualStart = textView.selectedRange.location;
+    NSUInteger actualEnd = NSMaxRange(textView.selectedRange);
+    NSString *visibleStartText = [[storageText substringToIndex:actualStart]
+        stringByReplacingOccurrencesOfString:@"\u200B"
+                                  withString:@""];
+    NSString *visibleEndText = [[storageText substringToIndex:actualEnd]
+        stringByReplacingOccurrencesOfString:@"\u200B"
+                                  withString:@""];
+    NSUInteger visibleStart = visibleStartText.length;
+    NSUInteger visibleEnd = visibleEndText.length;
+    emitter->onChangeSelection({.start = static_cast<int>(visibleStart),
+                                .end = static_cast<int>(visibleEnd),
+                                .text = [textAtSelection toCppString]});
   }
 
   // manage selection changes
@@ -2079,13 +2103,13 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
 - (void)onTextBlockTap:(TextBlockTapGestureRecognizer *)gr {
   if (gr.state != UIGestureRecognizerStateEnded)
     return;
-  if (![self->textView isFirstResponder]) {
-    [self->textView becomeFirstResponder];
-  }
 
   switch (gr.tapKind) {
 
   case TextBlockTapKindCheckbox: {
+    if (![self->textView isFirstResponder]) {
+      [self->textView becomeFirstResponder];
+    }
     CheckboxListStyle *checkboxStyle =
         (CheckboxListStyle *)stylesDict[@([CheckboxListStyle getType])];
 
@@ -2116,8 +2140,55 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
     break;
   }
 
+  case TextBlockTapKindPressableMention: {
+    [self->textView resignFirstResponder];
+    MentionStyle *mentionStyle =
+        (MentionStyle *)stylesDict[@([MentionStyle getType])];
+    MentionParams *mention =
+        [mentionStyle getMentionParamsAt:(NSUInteger)gr.characterIndex];
+    if (mention) {
+      [self emitOnMentionPressEvent:mention];
+    }
+    break;
+  }
+
   default:
     break;
+  }
+}
+
+- (void)emitOnMentionPressEvent:(MentionParams *)mention {
+  auto emitter = [self getEventEmitter];
+  if (emitter != nullptr) {
+    folly::dynamic attrsObj = folly::dynamic::object;
+    if (mention.attributes != nil) {
+      NSData *data =
+          [mention.attributes dataUsingEncoding:NSUTF8StringEncoding];
+      NSError *error = nil;
+      NSDictionary *dict = [NSJSONSerialization JSONObjectWithData:data
+                                                           options:0
+                                                             error:&error];
+      if (error != nil) {
+        NSLog(@"[EnrichedTextInputView] Failed to parse mention attributes "
+               "JSON: %@",
+              error);
+        return;
+      }
+
+      for (NSString *key in dict) {
+        id value = dict[key];
+        if ([value isKindOfClass:[NSString class]]) {
+          attrsObj[[key toCppString]] = [value toCppString];
+        }
+      }
+    }
+
+    emitter->onMentionPress({
+        .text = mention.text ? [mention.text toCppString] : std::string{},
+        .indicator =
+            mention.indicator ? [mention.indicator toCppString] : std::string{},
+        .attributes = attrsObj,
+    });
   }
 }
 

@@ -123,6 +123,7 @@ const assignDefaultValues = <T extends Record<string, any>>(
 };
 
 const parseStyle = (name: string, value: unknown) => {
+  if (name === 'fontWeight') return String(value);
   if (name !== 'color' && !name.endsWith('Color')) {
     return value;
   }

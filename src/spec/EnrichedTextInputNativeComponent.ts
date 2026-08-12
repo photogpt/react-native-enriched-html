@@ -139,6 +139,12 @@ export interface OnMentionDetectedInternal {
   payload: string;
 }
 
+export interface OnMentionPressEventInternal {
+  text: string;
+  indicator: string;
+  attributes: UnsafeMixed;
+}
+
 export interface OnMentionDetected {
   text: string;
   indicator: string;
@@ -386,6 +392,7 @@ export interface NativeProps extends ViewProps {
   onChangeState?: DirectEventHandler<OnChangeStateEvent>;
   onLinkDetected?: DirectEventHandler<OnLinkDetected>;
   onMentionDetected?: DirectEventHandler<OnMentionDetectedInternal>;
+  onMentionPress?: DirectEventHandler<OnMentionPressEventInternal>;
   onMention?: DirectEventHandler<OnMentionEvent>;
   onChangeSelection?: DirectEventHandler<OnChangeSelectionEvent>;
   onRequestHtmlResult?: DirectEventHandler<OnRequestHtmlResultEvent>;

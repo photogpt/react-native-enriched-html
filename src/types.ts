@@ -191,6 +191,20 @@ interface HeadingStyle {
 export interface MentionStyleProperties {
   color?: ColorValue;
   backgroundColor?: ColorValue;
+  borderColor?: ColorValue;
+  borderRadius?: number;
+  borderWidth?: number;
+  fontSize?: number;
+  fontStyle?: TextStyle['fontStyle'];
+  fontWeight?: TextStyle['fontWeight'];
+  letterSpacing?: number;
+  margin?: number;
+  marginBottom?: number;
+  marginLeft?: number;
+  marginRight?: number;
+  marginTop?: number;
+  paddingHorizontal?: number;
+  paddingVertical?: number;
   textDecorationLine?: 'underline' | 'none';
 }
 
@@ -713,6 +727,9 @@ export interface EnrichedTextInputProps extends Omit<ViewProps, 'children'> {
 
   /** Called when the editor resolves a mention node. */
   onMentionDetected?: (e: OnMentionDetected) => void;
+
+  /** Called when the user taps a pressable mention inside the editor. */
+  onMentionPress?: (event: OnMentionPressEvent) => void;
 
   /**
    * Called when a mention trigger character is typed. Use this to show a
