@@ -14,8 +14,8 @@
 #import "TextHtmlParser.h"
 #import <React/RCTConversions.h>
 #import <ReactNativeEnrichedHtml/EnrichedTextComponentDescriptor.h>
-#import <ReactNativeEnrichedHtml/EventEmitters.h>
-#import <ReactNativeEnrichedHtml/Props.h>
+#import <react/renderer/components/ReactNativeEnrichedSpec/EventEmitters.h>
+#import <react/renderer/components/ReactNativeEnrichedSpec/Props.h>
 #import <folly/dynamic.h>
 #import <react/utils/ManagedObjectWrapper.h>
 

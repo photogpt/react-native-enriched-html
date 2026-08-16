@@ -1,5 +1,5 @@
 #pragma once
-#import <ReactNativeEnrichedHtml/Props.h>
+#import <react/renderer/components/ReactNativeEnrichedSpec/Props.h>
 #import <UIKit/UIKit.h>
 
 using namespace facebook::react;

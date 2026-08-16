@@ -20,9 +20,9 @@
 #import "ZeroWidthSpaceUtils.h"
 #import <React/RCTConversions.h>
 #import <ReactNativeEnrichedHtml/EnrichedTextInputViewComponentDescriptor.h>
-#import <ReactNativeEnrichedHtml/EventEmitters.h>
-#import <ReactNativeEnrichedHtml/Props.h>
-#import <ReactNativeEnrichedHtml/RCTComponentViewHelpers.h>
+#import <react/renderer/components/ReactNativeEnrichedSpec/EventEmitters.h>
+#import <react/renderer/components/ReactNativeEnrichedSpec/Props.h>
+#import <react/renderer/components/ReactNativeEnrichedSpec/RCTComponentViewHelpers.h>
 #import <folly/dynamic.h>
 #import <react/utils/ManagedObjectWrapper.h>
 
