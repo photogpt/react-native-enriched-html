@@ -252,7 +252,7 @@
         "EnrichedTextInputView": "EnrichedTextInputView"
       }
     },
-    "includesGeneratedCode": true
+    "includesGeneratedCode": false
   },
   "create-react-native-library": {
     "languages": "kotlin-objc",

@@ -5,7 +5,12 @@ set(LIB_LITERAL ReactNativeEnrichedSpec)
 set(LIB_TARGET_NAME react_codegen_${LIB_LITERAL})
 
 set(LIB_ANDROID_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../..)
-set(LIB_ANDROID_GENERATED_JNI_DIR ${LIB_ANDROID_DIR}/generated/jni)
+# With `includesGeneratedCode: false` the RN gradle plugin generates codegen artifacts
+# at runtime into the package's gradle build dir rather than shipping them in the source
+# tree under `android/generated/`. CMake's `${CMAKE_CURRENT_SOURCE_DIR}` always points at
+# the source dir, so we anchor on `LIB_ANDROID_DIR` (= `node_modules/.../android/`) and
+# navigate into `build/generated/source/codegen/jni` where the JNI headers/sources land.
+set(LIB_ANDROID_GENERATED_JNI_DIR ${LIB_ANDROID_DIR}/build/generated/source/codegen/jni)
 set(LIB_ANDROID_GENERATED_COMPONENTS_DIR ${LIB_ANDROID_GENERATED_JNI_DIR}/react/renderer/components/${LIB_LITERAL})
 
 set(LIB_CPP_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../../../cpp)
