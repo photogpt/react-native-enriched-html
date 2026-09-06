@@ -113,9 +113,19 @@ static BOOL MentionUsesClock3Icon(MentionParams *params) {
     UIFont *spacerFont = [mentionFont
         fontWithSize:mentionFont.pointSize + 2 * styleProps.paddingVertical +
                      styleProps.marginTop + styleProps.marginBottom];
+    CGFloat desiredDescent = -mentionFont.descender +
+                             styleProps.paddingVertical +
+                             styleProps.marginBottom;
+    CGFloat bottomShortfall = MAX(desiredDescent + spacerFont.descender, 0);
+    CGFloat availableTopSpace =
+        MAX(spacerFont.ascender - mentionFont.ascender -
+                styleProps.paddingVertical - styleProps.marginTop,
+            0);
     NSDictionary *spacerAttrs = @{
       NSKernAttributeName : @(horizontalSpace),
       NSFontAttributeName : spacerFont,
+      NSBaselineOffsetAttributeName :
+          @(-MIN(bottomShortfall, availableTopSpace)),
     };
     [self.host.textView.textStorage
         addAttributes:spacerAttrs
