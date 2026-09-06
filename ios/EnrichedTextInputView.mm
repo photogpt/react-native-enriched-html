@@ -37,7 +37,8 @@ using namespace facebook::react;
 
 @interface EnrichedTextInputView () <
     RCTEnrichedTextInputViewViewProtocol, UITextViewDelegate,
-    UIGestureRecognizerDelegate, NSTextStorageDelegate, NSObject>
+    UIGestureRecognizerDelegate, NSLayoutManagerDelegate, NSTextStorageDelegate,
+    NSObject>
 
 @end
 
@@ -161,12 +162,25 @@ Class<RCTComponentViewProtocol> EnrichedTextInputViewCls(void) {
   textView.delegate = self;
   textView.input = self;
   textView.layoutManager.input = self;
+  textView.layoutManager.delegate = self;
   textView.textStorage.delegate = self;
 
   textView.adjustsFontForContentSizeCategory = YES;
   [textView addGestureRecognizer:[[TextBlockTapGestureRecognizer alloc]
                                      initWithInput:self
                                             action:@selector(onTextBlockTap:)]];
+}
+
+- (BOOL)layoutManager:(NSLayoutManager *)layoutManager
+    shouldBreakLineByWordBeforeCharacterAtIndex:(NSUInteger)charIndex {
+  if (charIndex == 0 || charIndex >= layoutManager.textStorage.length) {
+    return YES;
+  }
+
+  MentionStyle *mentionStyle = stylesDict[@([MentionStyle getType])];
+  MentionParams *before = [mentionStyle getMentionParamsAt:charIndex - 1];
+  MentionParams *after = [mentionStyle getMentionParamsAt:charIndex];
+  return before == nullptr || before != after;
 }
 
 - (void)setupPlaceholderLabel {

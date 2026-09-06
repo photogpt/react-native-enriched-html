@@ -122,16 +122,29 @@ static void const *kInputKey = &kInputKey;
                                                  inTextContainer:textContainer];
                                    rect.origin.x += origin.x;
                                    rect.origin.y += origin.y;
+
+                                   NSUInteger labelLocation =
+                                       mentionCharacterRange.location +
+                                       (hasLeadingSpacer ? 1 : 0);
+                                   NSRange labelGlyphRange = [self
+                                       glyphRangeForCharacterRange:
+                                           NSMakeRange(labelLocation, 1)
+                                              actualCharacterRange:nullptr];
+                                   UIFont *font = [host.textView.textStorage
+                                            attribute:NSFontAttributeName
+                                              atIndex:labelLocation
+                                       effectiveRange:nullptr];
+                                   CGPoint labelLocationInLine =
+                                       [self locationForGlyphAtIndex:
+                                                 labelGlyphRange.location];
+                                   CGFloat baselineY =
+                                       origin.y + CGRectGetMinY(lineRect) +
+                                       labelLocationInLine.y;
                                    if (hasLeadingSpacer) {
                                      rect.origin.x += props.marginLeft;
-                                     rect.origin.y += props.marginTop;
                                      rect.size.width = MAX(
                                          rect.size.width - props.marginLeft -
                                              props.marginRight,
-                                         0);
-                                     rect.size.height = MAX(
-                                         rect.size.height - props.marginTop -
-                                             props.marginBottom,
                                          0);
                                    } else {
                                      CGFloat leftExpansion =
@@ -158,6 +171,15 @@ static void const *kInputKey = &kInputKey;
                                          topExpansion + bottomExpansion;
                                    }
 
+                                   if (font != nullptr) {
+                                     rect.origin.y =
+                                         baselineY - font.ascender -
+                                         props.paddingVertical;
+                                     rect.size.height =
+                                         font.ascender - font.descender +
+                                         2 * props.paddingVertical;
+                                   }
+
                                    if (drawsBox) {
                                      UIBezierPath *path = [UIBezierPath
                                          bezierPathWithRoundedRect:rect
@@ -168,19 +190,28 @@ static void const *kInputKey = &kInputKey;
                                      [path fill];
 
                                      if (props.borderWidth > 0) {
+                                       CGFloat screenScale =
+                                           host.textView.window.screen.scale;
+                                       CGFloat borderWidth = MAX(
+                                           props.borderWidth,
+                                           screenScale > 0
+                                               ? 1.0 / screenScale
+                                               : props.borderWidth);
+                                       CGFloat inset = borderWidth / 2;
+                                       CGRect borderRect =
+                                           CGRectInset(rect, inset, inset);
+                                       CGFloat borderRadius =
+                                           MAX(props.borderRadius - inset, 0);
+                                       UIBezierPath *borderPath = [UIBezierPath
+                                           bezierPathWithRoundedRect:borderRect
+                                                        cornerRadius:
+                                                            borderRadius];
                                        [props.borderColor setStroke];
-                                       path.lineWidth = props.borderWidth;
-                                       [path stroke];
+                                       borderPath.lineWidth = borderWidth;
+                                       [borderPath stroke];
                                      }
                                    }
 
-                                   NSUInteger labelLocation =
-                                       mentionCharacterRange.location +
-                                       (hasLeadingSpacer ? 1 : 0);
-                                   NSRange labelGlyphRange = [self
-                                       glyphRangeForCharacterRange:
-                                           NSMakeRange(labelLocation, 1)
-                                              actualCharacterRange:nullptr];
                                    NSRange visibleLabelGlyphRange =
                                        NSIntersectionRange(labelGlyphRange,
                                                            range);
@@ -193,17 +224,19 @@ static void const *kInputKey = &kInputKey;
                                                              textContainer];
                                      labelRect.origin.x += origin.x;
                                      labelRect.origin.y += origin.y;
-                                     UIFont *font = [host.textView.textStorage
-                                              attribute:NSFontAttributeName
-                                                atIndex:labelLocation
-                                         effectiveRange:nullptr];
                                      CGFloat iconSize =
                                          font ? font.pointSize : props.fontSize;
                                      CGFloat scale = iconSize / 24;
                                      CGFloat iconX = CGRectGetMinX(labelRect) -
                                                      iconSize / 3 - iconSize;
-                                     CGFloat iconY = CGRectGetMidY(labelRect) -
-                                                     iconSize / 2;
+                                     CGFloat iconY =
+                                         font != nullptr
+                                             ? baselineY -
+                                                 (font.ascender +
+                                                  font.descender + iconSize) /
+                                                     2
+                                             : CGRectGetMidY(labelRect) -
+                                                 iconSize / 2;
                                      UIBezierPath *clock = [UIBezierPath
                                          bezierPathWithOvalInRect:
                                              CGRectMake(iconX + 2 * scale,
